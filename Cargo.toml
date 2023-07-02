@@ -1,0 +1,16 @@
+[package]
+name = "delirium"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.71"
+env_logger = "0.10.0"
+figment = { version = "0.10.10", features = ["toml", "env"] }
+jsonwebtoken = "8.3.0"
+log = { version = "0.4.19", features = ["serde"] }
+rand = "0.8.5"
+rocket = { version = "0.5.0-rc.3", default-features = false, features = ["json"] }
+rocket_okapi = { version = "0.8.0-rc.3", features = ["swagger", "rapidoc"] }
+serde = { version = "1.0", features = ["derive"] }
+sqlx = { version = "0.6.3", features = ["runtime-tokio-native-tls", "mysql"] }
