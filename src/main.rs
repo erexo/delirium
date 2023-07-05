@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use dotenv::dotenv;
 use log::{debug, trace};
 
 pub mod utils;
@@ -9,6 +10,7 @@ mod services;
 
 #[rocket::main]
 async fn main() -> Result<()> {
+    dotenv().ok();
     let cfg = config::new()?;
 
     env_logger::builder()

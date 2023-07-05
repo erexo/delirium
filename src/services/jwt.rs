@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{config, utils::time};
 
 pub struct Service {
-    refresh_tokens: Mutex<HashMap<u128, i64>>,
+    refresh_tokens: Mutex<HashMap<u128, i32>>,
 }
 
 pub fn new() -> Service {
@@ -19,7 +19,7 @@ pub fn new() -> Service {
 }
 
 impl Service {
-    pub fn register(&self, cfg: &config::Jwt, aid: i64) -> Result<(String, String)> {
+    pub fn register(&self, cfg: &config::Jwt, aid: i32) -> Result<(String, String)> {
         let refresh_id = self.refresh_id(aid);
         let now = time::now();
         let token = self.internal_refresh(cfg, refresh_id, now)?;
@@ -74,7 +74,7 @@ impl Service {
         .context("token")
     }
 
-    fn refresh_id(&self, aid: i64) -> u128 {
+    fn refresh_id(&self, aid: i32) -> u128 {
         let mut rtokens = self.refresh_tokens.lock().expect("lock");
         let mut refresh_id = random::<u128>();
         while rtokens.contains_key(&refresh_id) {
@@ -95,11 +95,11 @@ pub struct Claims {
     sub: String,
     iat: usize,
     exp: usize,
-    aid: i64,
+    aid: i32,
 }
 
 impl Claims {
-    pub fn aid(&self) -> i64 {
+    pub fn aid(&self) -> i32 {
         self.aid
     }
 }

@@ -8,15 +8,15 @@ use rocket_okapi::okapi::schemars::{self, JsonSchema};
 use rocket_okapi::openapi;
 use rocket_okapi::openapi_get_routes_spec;
 use serde::{Deserialize, Serialize};
-use sqlx::{MySql, Pool};
+use sqlx::{query, query_as, FromRow, MySql, Pool};
 
 use crate::config::Config;
 use crate::services::jwt;
 
-use super::JwtRefreshId;
+use super::{JwtAccountId, JwtRefreshId};
 
 pub(super) fn routes() -> (Vec<Route>, OpenApi) {
-    openapi_get_routes_spec![login, refresh_token, logout]
+    openapi_get_routes_spec![login, refresh_token, logout, account]
 }
 
 #[openapi]
@@ -50,21 +50,44 @@ async fn refresh_token(
 }
 
 #[openapi]
-#[get("/logout")]
+#[post("/logout")]
 fn logout(refresh_token: JwtRefreshId, jwt: &State<jwt::Service>) -> Status {
     jwt.unregister_token(refresh_token.0);
     Status::Ok
 }
 
-async fn account_id(data: &Login, db: &Pool<MySql>) -> Result<i64, Status> {
-    let id: sqlx::Result<(i64,)> =
-        sqlx::query_as("SELECT id FROM accounts WHERE BINARY name=? AND BINARY password=?")
-            .bind(&data.account)
-            .bind(&data.password)
-            .fetch_one(db)
-            .await;
+#[openapi]
+#[get("/account")]
+async fn account(aid: JwtAccountId, db: &State<Pool<MySql>>) -> Json<Account> {
+    let premium_points = query!("SELECT premium_points FROM accounts WHERE id=?", &aid.0)
+        .fetch_one(db.inner())
+        .await
+        .expect("nindo")
+        .premium_points;
+    let players = query_as!(
+        Player,
+        "SELECT id, name, level FROM players WHERE account_id=?",
+        &aid.0
+    )
+    .fetch_all(db.inner())
+    .await
+    .expect("players");
+    Json(Account {
+        players,
+        premium_points,
+    })
+}
+
+async fn account_id(data: &Login, db: &Pool<MySql>) -> Result<i32, Status> {
+    let id = query!(
+        "SELECT id FROM accounts WHERE BINARY name=? AND BINARY password=?",
+        &data.account,
+        &data.password
+    )
+    .fetch_one(db)
+    .await;
     match id {
-        Ok(o) => Ok(o.0),
+        Ok(o) => Ok(o.id),
         Err(err) => match err {
             sqlx::Error::RowNotFound => return Err(Status::Unauthorized),
             _ => panic!("{err}"),
@@ -80,7 +103,21 @@ struct Login {
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct Tokens {
+struct Tokens {
     token: String,
     refresh_token: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct Account {
+    premium_points: i32,
+    players: Vec<Player>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, FromRow)]
+struct Player {
+    id: i32,
+    name: String,
+    level: i32,
 }

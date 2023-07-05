@@ -60,7 +60,7 @@ pub fn attach() -> AdHoc {
     })
 }
 
-struct JwtAccountId(i64);
+struct JwtAccountId(i32);
 struct JwtRefreshId(u128, String);
 
 #[rocket::async_trait]
