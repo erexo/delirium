@@ -23,8 +23,8 @@ use crate::{
 };
 
 mod account;
+mod character;
 mod highscores;
-mod player;
 
 pub fn attach() -> AdHoc {
     AdHoc::on_ignite("Manage routes", |mut rocket| async {
@@ -32,7 +32,7 @@ pub fn attach() -> AdHoc {
         for (path, (routes, openapi)) in [
             ("/account", account::routes()),
             ("/highscores", highscores::routes()),
-            ("/player", player::routes()),
+            ("/character", character::routes()),
         ] {
             rocket = rocket.mount(path, routes);
             apis.push((path, openapi));

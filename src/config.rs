@@ -13,6 +13,7 @@ pub struct Config {
     pub api: Api,
     pub jwt: Jwt,
     pub database: Database,
+    pub character: Character,
     pub debug: Debug,
 }
 
@@ -42,6 +43,12 @@ pub struct Database {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Character {
+    pub insta_delete_below: i32,
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct Debug {
     pub log: LevelFilter,
     pub swagger: bool,
@@ -53,6 +60,7 @@ impl Default for Config {
             api: Default::default(),
             jwt: Default::default(),
             database: Default::default(),
+            character: Default::default(),
             debug: Default::default(),
         }
     }
@@ -87,6 +95,14 @@ impl Default for Database {
             password: Default::default(),
             database: "delirium".to_owned(),
             connections: 10,
+        }
+    }
+}
+
+impl Default for Character {
+    fn default() -> Self {
+        Self {
+            insta_delete_below: 10,
         }
     }
 }

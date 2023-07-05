@@ -27,7 +27,9 @@ async fn login(
     db: &State<Pool<MySql>>,
     jwt: &State<jwt::Service>,
 ) -> Result<Json<Tokens>, Status> {
-    let id = account_id(&payload, db.inner()).await?;
+    let id = account_id(&payload, db.inner())
+        .await
+        .ok_or(Status::Unauthorized)?;
     let (token, refresh_token) = jwt.register(&config.jwt, id).expect("tokens");
     Ok(Json(Tokens {
         token,
@@ -57,42 +59,37 @@ fn logout(refresh_token: JwtRefreshId, jwt: &State<jwt::Service>) -> Status {
 }
 
 #[openapi]
-#[get("/account")]
+#[get("/")]
 async fn account(aid: JwtAccountId, db: &State<Pool<MySql>>) -> Json<Account> {
     let premium_points = query!("SELECT premium_points FROM accounts WHERE id=?", &aid.0)
         .fetch_one(db.inner())
         .await
         .expect("nindo")
         .premium_points;
-    let players = query_as!(
-        Player,
-        "SELECT id, name, level FROM players WHERE account_id=?",
+    let characters = query_as!(
+        Character,
+        r#"SELECT id, name, level, deleted AS "deleted:_" FROM players WHERE account_id=?"#,
         &aid.0
     )
     .fetch_all(db.inner())
     .await
     .expect("players");
     Json(Account {
-        players,
+        characters,
         premium_points,
     })
 }
 
-async fn account_id(data: &Login, db: &Pool<MySql>) -> Result<i32, Status> {
-    let id = query!(
+async fn account_id(data: &Login, db: &Pool<MySql>) -> Option<i32> {
+    query!(
         "SELECT id FROM accounts WHERE BINARY name=? AND BINARY password=?",
         &data.account,
         &data.password
     )
-    .fetch_one(db)
-    .await;
-    match id {
-        Ok(o) => Ok(o.id),
-        Err(err) => match err {
-            sqlx::Error::RowNotFound => return Err(Status::Unauthorized),
-            _ => panic!("{err}"),
-        },
-    }
+    .fetch_optional(db)
+    .await
+    .expect("aid")
+    .map(|r| r.id)
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -112,12 +109,13 @@ struct Tokens {
 #[serde(rename_all = "camelCase")]
 struct Account {
     premium_points: i32,
-    players: Vec<Player>,
+    characters: Vec<Character>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, FromRow)]
-struct Player {
+struct Character {
     id: i32,
     name: String,
     level: i32,
+    deleted: bool,
 }
