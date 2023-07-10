@@ -9,11 +9,13 @@ use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
+#[derive(Default)]
 pub struct Config {
     pub api: Api,
     pub jwt: Jwt,
     pub database: Database,
     pub character: Character,
+    pub validation: Validation,
     pub debug: Debug,
 }
 
@@ -49,22 +51,19 @@ pub struct Character {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Validation {
+    pub min_length: usize,
+    pub max_length: usize,
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct Debug {
     pub log: LevelFilter,
     pub swagger: bool,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            api: Default::default(),
-            jwt: Default::default(),
-            database: Default::default(),
-            character: Default::default(),
-            debug: Default::default(),
-        }
-    }
-}
+
 
 impl Default for Api {
     fn default() -> Self {
@@ -107,6 +106,15 @@ impl Default for Character {
     }
 }
 
+impl Default for Validation {
+    fn default() -> Self {
+        Self {
+            min_length: 4,
+            max_length: 20,
+        }
+    }
+}
+
 impl Default for Debug {
     fn default() -> Self {
         Self {
@@ -126,9 +134,10 @@ pub fn new() -> Result<Config> {
 
 impl Config {
     pub fn rocket(&self) -> rocket::config::Config {
-        let mut ret = rocket::config::Config::default();
-        ret.address = self.api.address;
-        ret.port = self.api.port;
-        ret
+        rocket::Config {
+            address: self.api.address,
+            port: self.api.port,
+            ..Default::default()
+        }
     }
 }

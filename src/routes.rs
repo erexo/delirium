@@ -1,21 +1,27 @@
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use log::error;
 use rocket::{
     fairing::AdHoc,
     http::Status,
     request::{FromRequest, Outcome},
+    response::Responder,
+    serde::json::Json,
     Request,
 };
 use rocket_okapi::{
     gen::OpenApiGenerator,
     okapi::{
         merge::marge_spec_list,
-        openapi3::{Object, SecurityRequirement, SecurityScheme, SecuritySchemeData},
+        openapi3::{Object, Responses, SecurityRequirement, SecurityScheme, SecuritySchemeData},
+        schemars::{self, JsonSchema},
     },
     request::{OpenApiFromRequest, RequestHeaderInput},
+    response::OpenApiResponderInner,
     settings::OpenApiSettings,
     swagger_ui::{make_swagger_ui, SwaggerUIConfig},
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use crate::{
     config::{self, Config},
@@ -117,7 +123,7 @@ impl<'a> OpenApiFromRequest<'a> for JwtRefreshId {
     }
 }
 
-fn bearer<'a>(request: &'a Request<'_>) -> Result<&'a str, &'a str> {
+fn bearer<'a>(request: &'a Request<'_>) -> core::result::Result<&'a str, &'a str> {
     match request.headers().get_one("Authorization") {
         Some(token) => {
             const PREFIX: &str = "Bearer ";
@@ -131,7 +137,10 @@ fn bearer<'a>(request: &'a Request<'_>) -> Result<&'a str, &'a str> {
     }
 }
 
-fn validate<T: DeserializeOwned>(token: &str, jwt: &config::Jwt) -> Result<T, String> {
+fn validate<T: DeserializeOwned>(
+    token: &str,
+    jwt: &config::Jwt,
+) -> core::result::Result<T, String> {
     let mut validation = Validation::new(Algorithm::HS256);
     validation.sub = jwt.subject.clone();
     if let Some(ref audience) = jwt.audience {
@@ -167,4 +176,55 @@ fn internal_from_request_input(
         security_scheme,
         security_req,
     ))
+}
+
+type Result<T> = core::result::Result<T, Error>;
+
+struct Error(Status, Option<String>);
+
+impl Error {
+    fn status(status: Status) -> Error {
+        Error(status, None)
+    }
+
+    fn validation<T: Into<String>>(message: T) -> Error {
+        Error(Status::UnprocessableEntity, Some(message.into()))
+    }
+}
+
+impl From<anyhow::Error> for Error {
+    fn from(value: anyhow::Error) -> Self {
+        error!("{:?}", value);
+        Error::status(Status::InternalServerError)
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Serialize, Deserialize, JsonSchema)]
+struct Response {
+    code: u16,
+    status: String,
+    message: Option<String>,
+}
+
+impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
+    fn respond_to(self, request: &'r Request<'_>) -> rocket::response::Result<'o> {
+        rocket::response::Response::build()
+            .merge(
+                Json(Response {
+                    code: self.0.code,
+                    status: self.0.reason_lossy().to_owned(),
+                    message: self.1,
+                })
+                .respond_to(request)?,
+            )
+            .status(self.0)
+            .ok()
+    }
+}
+
+impl OpenApiResponderInner for Error {
+    fn responses(gen: &mut OpenApiGenerator) -> rocket_okapi::Result<Responses> {
+        <Json<Response> as OpenApiResponderInner>::responses(gen)
+    }
 }

@@ -1,3 +1,4 @@
+use log::info;
 use rocket::{delete, http::Status, Route, State};
 use rocket_okapi::{okapi::openapi3::OpenApi, openapi, openapi_get_routes_spec};
 use sqlx::{query, MySql, Pool};
@@ -18,9 +19,11 @@ async fn delete(
     cfg: &State<Config>,
     db: &State<Pool<MySql>>,
 ) -> Status {
+    // name regex: ^(?:[a-zA-Z]{3,}\b(?:\s+[a-zA-Z]{3,}\b){0,2})?$
+    let name = name.trim();
     if let Some(record) = query!(
         "SELECT id, account_id, level FROM players WHERE name=? AND NOT deleted",
-        name.trim()
+        name
     )
     .fetch_optional(db.inner())
     .await
@@ -34,11 +37,13 @@ async fn delete(
                 .execute(db.inner())
                 .await
                 .expect("delete player");
+            info!("Deleted character \"{}\"", name)
         } else {
             query!("UPDATE players SET deleted=1 WHERE id=?", record.id)
                 .execute(db.inner())
                 .await
                 .expect("mark delete player");
+            info!("Marked character \"{}\" as deleted", name)
         }
     };
     Status::Accepted
