@@ -1,4 +1,6 @@
 /target
+*.sh
+screenlog.*
 
 .env
 config.toml

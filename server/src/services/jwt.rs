@@ -2,9 +2,9 @@ use std::{collections::HashMap, sync::Mutex};
 
 use anyhow::{Context, Result};
 use jsonwebtoken::{encode, EncodingKey, Header};
-use log::{debug, warn};
 use rand::random;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, warn};
 
 use crate::{config, utils::time};
 
@@ -19,10 +19,11 @@ pub fn new() -> Service {
 }
 
 impl Service {
-    pub fn register(&self, cfg: &config::Jwt, aid: i32) -> Result<(String, String)> {
+    pub fn register(&self, aid: i32) -> Result<(String, String)> {
+        let cfg = &config::get().jwt;
         let refresh_id = self.refresh_id(aid);
         let now = time::now();
-        let token = self.internal_refresh(cfg, refresh_id, now)?;
+        let account_token = self.internal_refresh(refresh_id, now)?;
         let refresh_token = encode(
             &Header::default(),
             &RefreshClaims {
@@ -37,7 +38,7 @@ impl Service {
         .context("refresh token")?;
 
         debug!("Generated token pair for '{aid}'");
-        Ok((token, refresh_token))
+        Ok((account_token, refresh_token))
     }
 
     pub fn unregister_token(&self, rid: u128) {
@@ -49,11 +50,12 @@ impl Service {
         }
     }
 
-    pub fn refresh(&self, cfg: &config::Jwt, rid: u128) -> Result<String> {
-        self.internal_refresh(cfg, rid, time::now())
+    pub fn refresh(&self, rid: u128) -> Result<String> {
+        self.internal_refresh(rid, time::now())
     }
 
-    fn internal_refresh(&self, cfg: &config::Jwt, rid: u128, now: usize) -> Result<String> {
+    fn internal_refresh(&self, rid: u128, now: usize) -> Result<String> {
+        let cfg = &config::get().jwt;
         let aid = *self
             .refresh_tokens
             .lock()
@@ -62,7 +64,7 @@ impl Service {
             .context("No refresh token found")?;
         encode(
             &Header::default(),
-            &Claims {
+            &AccountClaims {
                 aud: cfg.audience.clone().unwrap_or_default(),
                 sub: cfg.subject.clone().unwrap_or_default(),
                 iat: now,
@@ -90,7 +92,7 @@ impl Service {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Claims {
+pub struct AccountClaims {
     aud: String,
     sub: String,
     iat: usize,
@@ -98,7 +100,7 @@ pub struct Claims {
     aid: i32,
 }
 
-impl Claims {
+impl AccountClaims {
     pub fn aid(&self) -> i32 {
         self.aid
     }

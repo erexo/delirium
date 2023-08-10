@@ -1,21 +1,22 @@
 use anyhow::{Context, Result};
 use dotenv::dotenv;
-use log::{debug, trace};
+use poem::{listener::TcpListener, Server};
+use tracing::trace;
 
 pub mod utils;
 
+mod api;
 mod config;
-mod routes;
 mod services;
 
-#[rocket::main]
+#[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
-    let cfg = config::new()?;
+    let cfg = config::get();
 
-    env_logger::builder()
-        .filter_level(cfg.debug.log)
-        .format_target(false)
+    tracing_subscriber::fmt()
+        .with_max_level(cfg.debug.log)
+        .with_target(false)
         .init();
 
     trace!("hi");
@@ -28,14 +29,10 @@ async fn main() -> Result<()> {
         ))
         .await
         .context("database connection")?;
+    let jwt = services::jwt::new();
 
-    let rocket = rocket::custom(cfg.rocket())
-        .attach(routes::attach())
-        .attach(services::attach())
-        .manage(cfg)
-        .manage(pool)
-        .launch()
-        .await?;
-    debug!("{rocket:?}");
-    Ok(())
+    Server::new(TcpListener::bind((cfg.api.address, cfg.api.port)))
+        .run(api::routes(&pool, jwt))
+        .await
+        .context("server start")
 }

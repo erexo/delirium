@@ -1,15 +1,36 @@
 use std::net::{IpAddr, Ipv4Addr};
 
-use anyhow::{Context, Result};
 use figment::{
     providers::{Env, Format, Serialized, Toml},
     Figment,
 };
-use log::LevelFilter;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use tracing::metadata::LevelFilter;
 
-#[derive(Deserialize, Serialize)]
-#[derive(Default)]
+lazy_static! {
+    static ref CONFIG: Config = new();
+}
+
+pub fn get() -> &'static Config {
+    &CONFIG
+}
+
+// used by validation macro
+pub fn field_length() -> (usize, usize) {
+    let cfg = &get().validation;
+    (cfg.min_length, cfg.max_length)
+}
+
+fn new() -> Config {
+    Figment::from(Serialized::defaults(Config::default()))
+        .merge(Toml::file("config.toml"))
+        .merge(Env::prefixed("DELIRIUM_").split("_"))
+        .extract()
+        .expect("config")
+}
+
+#[derive(Deserialize, Serialize, Default)]
 pub struct Config {
     pub api: Api,
     pub jwt: Jwt,
@@ -59,11 +80,31 @@ pub struct Validation {
 
 #[derive(Deserialize, Serialize)]
 pub struct Debug {
-    pub log: LevelFilter,
+    pub log: Log,
     pub swagger: bool,
 }
 
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Log {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
 
+impl From<Log> for LevelFilter {
+    fn from(value: Log) -> Self {
+        match value {
+            Log::Error => LevelFilter::ERROR,
+            Log::Warn => LevelFilter::WARN,
+            Log::Info => LevelFilter::INFO,
+            Log::Debug => LevelFilter::DEBUG,
+            Log::Trace => LevelFilter::TRACE,
+        }
+    }
+}
 
 impl Default for Api {
     fn default() -> Self {
@@ -118,26 +159,8 @@ impl Default for Validation {
 impl Default for Debug {
     fn default() -> Self {
         Self {
-            log: LevelFilter::Warn,
+            log: Log::Warn,
             swagger: false,
-        }
-    }
-}
-
-pub fn new() -> Result<Config> {
-    Figment::from(Serialized::defaults(Config::default()))
-        .merge(Toml::file("config.toml"))
-        .merge(Env::prefixed("DELIRIUM_").split("_"))
-        .extract()
-        .context("config")
-}
-
-impl Config {
-    pub fn rocket(&self) -> rocket::config::Config {
-        rocket::Config {
-            address: self.api.address,
-            port: self.api.port,
-            ..Default::default()
         }
     }
 }
