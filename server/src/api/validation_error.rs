@@ -8,10 +8,14 @@ pub enum ValidationError {
     Unknown,
     MinLength { field: &'static str, min: usize },
     MaxLength { field: &'static str, max: usize },
+    Ascii { field: &'static str },
+    Alphanumeric { field: &'static str },
     Pattern { field: &'static str, value: String },
     // EntityNotExists(&'static str),
     AccountAlreadyExists,
     EmailAlreadyExists,
+    IndistinctPasswords,
+    InvalidCurrentPassword,
 }
 
 #[derive(Object)]

@@ -151,7 +151,7 @@ impl Default for Validation {
     fn default() -> Self {
         Self {
             min_length: 4,
-            max_length: 20,
+            max_length: 32,
         }
     }
 }

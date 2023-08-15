@@ -17,6 +17,10 @@ struct ValidationField {
     #[darling(default)]
     trim: bool,
     #[darling(default)]
+    ascii: bool,
+    #[darling(default)]
+    alphanumeric: bool,
+    #[darling(default)]
     length: Option<Path>,
     #[darling(default)]
     pattern: Option<SpannedValue<String>>,
@@ -30,6 +34,10 @@ struct ValidationInput {
 
     #[darling(default)]
     trim: bool,
+    #[darling(default)]
+    ascii: bool,
+    #[darling(default)]
+    alphanumeric: bool,
     #[darling(default)]
     length: Option<Path>,
 }
@@ -51,6 +59,8 @@ pub fn derive_validation_impl(input: TokenStream) -> syn::Result<TokenStream> {
     let string_type = get_type("String");
 
     let mut trims = Vec::new();
+    let mut asciis = Vec::new();
+    let mut alphanumerics = Vec::new();
     let mut lengths = Vec::new();
     let mut patterns = Vec::new();
     for field in &args.fields {
@@ -71,7 +81,33 @@ pub fn derive_validation_impl(input: TokenStream) -> syn::Result<TokenStream> {
                 ));
             }
         }
-
+        if field.alphanumeric || input.alphanumeric {
+            if field.ty == string_type {
+                alphanumerics.push(quote!{
+                    if self.#ident.chars().any(|c| !c.is_ascii_alphanumeric()) {
+                        return Err(crate::api::validation_error::ValidationError::Alphanumeric { field: #ident_str }.into());
+                    }
+                });
+            } else if field.alphanumeric {
+                return Err(Error::new_spanned(
+                        ident,
+                        "Alphanumeric attr may only be applied on String field",
+                        ));
+            }
+        } else if field.ascii || input.ascii {
+            if field.ty == string_type {
+                asciis.push(quote!{
+                    if self.#ident.chars().any(|c| !c.is_ascii()) {
+                        return Err(crate::api::validation_error::ValidationError::Ascii { field: #ident_str }.into());
+                    }
+                });
+            } else if field.ascii {
+                return Err(Error::new_spanned(
+                    ident,
+                    "Ascii attr may only be applied on String field",
+                ));
+            }
+        }
         if let Some(length) = field.length.as_ref().or(input.length.as_ref()) {
             if field.ty == string_type {
                 lengths.push(quote!{
@@ -110,6 +146,8 @@ pub fn derive_validation_impl(input: TokenStream) -> syn::Result<TokenStream> {
         impl #ident {
             pub fn validate(&mut self) -> poem::Result<()> {
                 #(#trims)*
+                #(#asciis)*
+                #(#alphanumerics)*
                 #(#lengths)*
                 #(#patterns)*
                 Ok(())

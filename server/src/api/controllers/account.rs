@@ -11,7 +11,6 @@ use anyhow::Context;
 use delirium_macros::Validation;
 use poem::http::StatusCode;
 use poem_openapi::{payload::Json, Object, OpenApi};
-use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, FromRow, MySql, Pool};
 
 pub struct Api {
@@ -118,11 +117,37 @@ impl Api {
             premium_points,
         }))
     }
+
+    /// Change Password
+    #[oai(path = "/password", method = "patch")]
+    async fn password(&self, auth: JwtAccountId, data: Json<Password>) -> Result<()> {
+        if data.current == data.new {
+            return Err(IndistinctPasswords.into());
+        }
+        if query!(
+            "UPDATE accounts SET password=? WHERE id=? AND BINARY password=?",
+            &data.new,
+            &auth.0,
+            &data.current
+        )
+        .execute(&self.db)
+        .await
+        .context("change password")?
+        .rows_affected()
+            == 0
+        {
+            Err(InvalidCurrentPassword.into())
+        } else {
+            // todo: logout current sessions
+            Ok(())
+        }
+    }
 }
 
-#[derive(Object, Serialize, Deserialize, Validation)]
-#[val(trim, length = "crate::config::field_length")]
+#[derive(Object, Validation)]
+#[val(trim, ascii, length = "crate::config::field_length")]
 struct Create {
+    #[val(alphanumeric)]
     account: String,
     password: String,
     #[val(
@@ -131,27 +156,36 @@ struct Create {
     email: String,
 }
 
-#[derive(Object, Serialize, Deserialize)]
+#[derive(Object, Validation)]
+#[val(trim, ascii)]
+struct Password {
+    current: String,
+    #[val(length = "crate::config::field_length")]
+    new: String,
+}
+
+#[derive(Object, Validation)]
+#[val(trim, ascii)]
 struct Login {
     account: String,
     password: String,
 }
 
-#[derive(Object, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Object)]
+#[oai(rename_all = "camelCase")]
 struct Tokens {
     account_token: String,
     refresh_token: String,
 }
 
-#[derive(Object, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Object)]
+#[oai(rename_all = "camelCase")]
 struct Account {
     premium_points: i32,
     characters: Vec<Character>,
 }
 
-#[derive(Object, Serialize, Deserialize, FromRow)]
+#[derive(Object, FromRow)]
 struct Character {
     id: i32,
     name: String,
