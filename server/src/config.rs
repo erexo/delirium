@@ -1,11 +1,14 @@
-use std::net::{IpAddr, Ipv4Addr};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr},
+};
 
 use figment::{
     providers::{Env, Format, Serialized, Toml},
     Figment,
 };
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use tracing::metadata::LevelFilter;
 
 lazy_static! {
@@ -35,6 +38,9 @@ pub struct Config {
     pub api: Api,
     pub jwt: Jwt,
     pub database: Database,
+    #[serde(deserialize_with = "deserialize_str_map")]
+    pub worlds: HashMap<u32, String>,
+    pub account: Account,
     pub character: Character,
     pub validation: Validation,
     pub debug: Debug,
@@ -42,6 +48,7 @@ pub struct Config {
 
 #[derive(Deserialize, Serialize)]
 pub struct Api {
+    pub name: String,
     pub address: IpAddr,
     pub port: u16,
 }
@@ -67,8 +74,36 @@ pub struct Database {
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Account {
+    pub max_characters: u32,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Character {
     pub insta_delete_below: i32,
+    pub new: NewCharacter,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewCharacter {
+    pub health: u32,
+    pub mana: u32,
+    pub soul: u32,
+    pub cap: u32,
+    pub town: u32,
+    pub pos_x: u32,
+    pub pos_y: u32,
+    pub pos_z: u32,
+    #[serde(deserialize_with = "deserialize_str_map")]
+    pub vocations: HashMap<u32, NewVocation>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct NewVocation {
+    pub vocation: u32,
+    pub looktype: u32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -109,6 +144,7 @@ impl From<Log> for LevelFilter {
 impl Default for Api {
     fn default() -> Self {
         Self {
+            name: "Delirium".to_owned(),
             address: Ipv4Addr::new(127, 0, 0, 1).into(),
             port: 80,
         }
@@ -139,10 +175,44 @@ impl Default for Database {
     }
 }
 
+impl Default for Account {
+    fn default() -> Self {
+        Self {
+            max_characters: 10,
+        }
+    }
+}
+
 impl Default for Character {
     fn default() -> Self {
         Self {
             insta_delete_below: 10,
+            new: Default::default(),
+        }
+    }
+}
+
+impl Default for NewCharacter {
+    fn default() -> Self {
+        Self {
+            health: 200,
+            mana: 0,
+            soul: 100,
+            cap: 420,
+            town: 1,
+            pos_x: 1000,
+            pos_y: 1000,
+            pos_z: 7,
+            vocations: HashMap::new(),
+        }
+    }
+}
+
+impl Default for NewVocation {
+    fn default() -> Self {
+        Self {
+            vocation: 0,
+            looktype: 100,
         }
     }
 }
@@ -163,4 +233,20 @@ impl Default for Debug {
             swagger: false,
         }
     }
+}
+
+fn deserialize_str_map<'de, D, V>(deserializer: D) -> Result<HashMap<u32, V>, D::Error>
+where
+    D: Deserializer<'de>,
+    V: Deserialize<'de>,
+{
+    let s: HashMap<String, V> = Deserialize::deserialize(deserializer)?;
+    let mut ret = HashMap::new();
+    for (k, v) in s {
+        let k = k
+            .parse()
+            .map_err(|_| serde::de::Error::custom("key is not u32"))?;
+        ret.insert(k, v);
+    }
+    Ok(ret)
 }

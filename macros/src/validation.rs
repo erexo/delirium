@@ -17,6 +17,8 @@ struct ValidationField {
     #[darling(default)]
     trim: bool,
     #[darling(default)]
+    to_title: bool,
+    #[darling(default)]
     ascii: bool,
     #[darling(default)]
     alphanumeric: bool,
@@ -59,6 +61,7 @@ pub fn derive_validation_impl(input: TokenStream) -> syn::Result<TokenStream> {
     let string_type = get_type("String");
 
     let mut trims = Vec::new();
+    let mut titles = Vec::new();
     let mut asciis = Vec::new();
     let mut alphanumerics = Vec::new();
     let mut lengths = Vec::new();
@@ -81,6 +84,29 @@ pub fn derive_validation_impl(input: TokenStream) -> syn::Result<TokenStream> {
                 ));
             }
         }
+        if field.to_title {
+            if field.ty == string_type {
+                titles.push(quote! {
+                    let mut prev = ' ';
+                    self.#ident = self.#ident.chars()
+                        .map(|c| {
+                            if !prev.is_alphabetic() {
+                                prev = c;
+                                c.to_ascii_uppercase()
+                            } else {
+                                prev = c;
+                                c.to_ascii_lowercase()
+                            }
+                        })
+                    .collect();
+                })
+            } else if field.trim {
+                return Err(Error::new_spanned(
+                    ident,
+                    "Title attr may only be applied on String field",
+                ));
+            }
+        }
         if field.alphanumeric || input.alphanumeric {
             if field.ty == string_type {
                 alphanumerics.push(quote!{
@@ -90,9 +116,9 @@ pub fn derive_validation_impl(input: TokenStream) -> syn::Result<TokenStream> {
                 });
             } else if field.alphanumeric {
                 return Err(Error::new_spanned(
-                        ident,
-                        "Alphanumeric attr may only be applied on String field",
-                        ));
+                    ident,
+                    "Alphanumeric attr may only be applied on String field",
+                ));
             }
         } else if field.ascii || input.ascii {
             if field.ty == string_type {
@@ -146,6 +172,7 @@ pub fn derive_validation_impl(input: TokenStream) -> syn::Result<TokenStream> {
         impl #ident {
             pub fn validate(&mut self) -> poem::Result<()> {
                 #(#trims)*
+                #(#titles)*
                 #(#asciis)*
                 #(#alphanumerics)*
                 #(#lengths)*

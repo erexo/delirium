@@ -11,11 +11,14 @@ pub enum ValidationError {
     Ascii { field: &'static str },
     Alphanumeric { field: &'static str },
     Pattern { field: &'static str, value: String },
+    InvalidData,
     // EntityNotExists(&'static str),
     AccountAlreadyExists,
     EmailAlreadyExists,
     IndistinctPasswords,
     InvalidCurrentPassword,
+    TooManyCharacters,
+    PlayerAlreadyExists,
 }
 
 #[derive(Object)]

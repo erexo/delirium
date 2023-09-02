@@ -29,7 +29,7 @@ pub fn api(db: &Pool<MySql>, jwt: &Arc<jwt::Service>) -> Api {
 impl Api {
     /// Create Account
     #[oai(path = "/", method = "put")]
-    async fn create(&self, mut data: Json<Create>) -> Result<Json<Tokens>> {
+    async fn create(&self, mut data: Json<CreateAccount>) -> Result<Json<Tokens>> {
         data.validate()?;
         if let Some(result) = query!(
             "SELECT name, email FROM accounts WHERE name LIKE ? or email LIKE ?",
@@ -105,7 +105,7 @@ impl Api {
             .context("nindo")?
             .premium_points;
         let characters = query_as!(
-            Character,
+            AccountCharacter,
             r#"SELECT id, name, level, deleted AS "deleted:_" FROM players WHERE account_id=?"#,
             &auth.0
         )
@@ -120,7 +120,7 @@ impl Api {
 
     /// Change Password
     #[oai(path = "/password", method = "patch")]
-    async fn password(&self, auth: JwtAccountId, data: Json<Password>) -> Result<()> {
+    async fn password(&self, auth: JwtAccountId, data: Json<ChangePassword>) -> Result<()> {
         if data.current == data.new {
             return Err(IndistinctPasswords.into());
         }
@@ -146,7 +146,7 @@ impl Api {
 
 #[derive(Object, Validation)]
 #[val(trim, ascii, length = "crate::config::field_length")]
-struct Create {
+struct CreateAccount {
     #[val(alphanumeric)]
     account: String,
     password: String,
@@ -158,7 +158,7 @@ struct Create {
 
 #[derive(Object, Validation)]
 #[val(trim, ascii)]
-struct Password {
+struct ChangePassword {
     current: String,
     #[val(length = "crate::config::field_length")]
     new: String,
@@ -182,11 +182,11 @@ struct Tokens {
 #[oai(rename_all = "camelCase")]
 struct Account {
     premium_points: i32,
-    characters: Vec<Character>,
+    characters: Vec<AccountCharacter>,
 }
 
 #[derive(Object, FromRow)]
-struct Character {
+struct AccountCharacter {
     id: i32,
     name: String,
     level: i32,
