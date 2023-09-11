@@ -111,6 +111,28 @@ impl Api {
         };
         Ok(())
     }
+
+    /// Undelete Character
+    #[oai(path = "/", method = "patch")]
+    async fn undelete(&self, auth: JwtAccountId, id: Json<i32>) -> Result<()> {
+        let record = query!(
+            "SELECT id, account_id, level FROM players WHERE id=? AND deleted",
+            id.0
+        )
+        .fetch_optional(&self.db)
+        .await
+        .context("record")?;
+        if let Some(record) = record {
+            if record.account_id == auth.0 {
+                query!("UPDATE players SET deleted=0 WHERE id=?", record.id)
+                    .execute(&self.db)
+                    .await
+                    .context("mark undelete player")?;
+                info!("Undeleted character '{}'", id.0);
+            }
+        };
+        Ok(())
+    }
 }
 
 #[derive(Object, Validation)]
