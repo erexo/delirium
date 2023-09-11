@@ -1,5 +1,6 @@
 pub(super) mod account;
 pub(super) mod character;
+pub(super) mod highscores;
 pub(super) mod validation;
 
 mod prelude {
@@ -11,5 +12,6 @@ mod prelude {
 pub enum Tags {
     Account,
     Character,
+    Highscores,
     Validation,
 }

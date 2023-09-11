@@ -42,6 +42,7 @@ pub struct Config {
     pub worlds: HashMap<u32, String>,
     pub account: Account,
     pub character: Character,
+    pub highscores: Highscores,
     pub validation: Validation,
     pub debug: Debug,
 }
@@ -83,6 +84,12 @@ pub struct Account {
 pub struct Character {
     pub insta_delete_below: i32,
     pub new: NewCharacter,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Highscores {
+    pub page_count: u32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -177,9 +184,7 @@ impl Default for Database {
 
 impl Default for Account {
     fn default() -> Self {
-        Self {
-            max_characters: 10,
-        }
+        Self { max_characters: 10 }
     }
 }
 
@@ -189,6 +194,12 @@ impl Default for Character {
             insta_delete_below: 10,
             new: Default::default(),
         }
+    }
+}
+
+impl Default for Highscores {
+    fn default() -> Self {
+        Self { page_count: 20 }
     }
 }
 

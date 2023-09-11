@@ -8,7 +8,7 @@ use poem_openapi::OpenApiService;
 use sqlx::{MySql, Pool};
 use tracing::error;
 
-use crate::{services::jwt, config};
+use crate::{config, services::jwt};
 
 pub mod controllers;
 pub mod jwt_bearer;
@@ -18,7 +18,12 @@ pub mod validation_error;
 pub fn routes(db: &Pool<MySql>, jwt: jwt::Service) -> impl IntoEndpoint {
     let jwt = &Arc::new(jwt);
     use controllers::*;
-    let controllers = (validation::Api, account::api(db, jwt), character::api(db));
+    let controllers = (
+        validation::Api,
+        account::api(db, jwt),
+        character::api(db),
+        highscores::api(db),
+    );
     let api = OpenApiService::new(controllers, &config::get().api.name, "1.0");
     let docs = api.swagger_ui();
     Route::new()
