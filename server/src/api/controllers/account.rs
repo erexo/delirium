@@ -189,7 +189,7 @@ struct Account {
 struct AccountCharacter {
     id: i32,
     name: String,
-    level: i32,
+    level: u32,
     deleted: bool,
 }
 

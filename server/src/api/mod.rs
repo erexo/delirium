@@ -23,6 +23,7 @@ pub fn routes(db: &Pool<MySql>, jwt: jwt::Service) -> impl IntoEndpoint {
         account::api(db, jwt),
         character::api(db),
         highscores::api(db),
+        online::api(db),
     );
     let api = OpenApiService::new(controllers, &config::get().api.name, "1.0");
     let docs = api.swagger_ui();

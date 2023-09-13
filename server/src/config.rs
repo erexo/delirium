@@ -82,7 +82,8 @@ pub struct Account {
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Character {
-    pub insta_delete_below: i32,
+    pub insta_delete_below: u32,
+    pub vocations: HashMap<String, Vec<u32>>,
     pub new: NewCharacter,
 }
 
@@ -192,6 +193,7 @@ impl Default for Character {
     fn default() -> Self {
         Self {
             insta_delete_below: 10,
+            vocations: HashMap::new(),
             new: Default::default(),
         }
     }

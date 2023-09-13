@@ -107,8 +107,8 @@ enum Skill {
 struct LevelHighscores {
     id: i32,
     name: String,
-    level: i32,
-    experience: i64,
+    level: u32,
+    experience: u64,
 }
 
 #[derive(Object, FromRow)]
