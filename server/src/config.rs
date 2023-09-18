@@ -91,6 +91,7 @@ pub struct Character {
 #[serde(rename_all = "camelCase")]
 pub struct Highscores {
     pub page_count: u32,
+    pub vocation_cache_time: usize,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -201,7 +202,10 @@ impl Default for Character {
 
 impl Default for Highscores {
     fn default() -> Self {
-        Self { page_count: 20 }
+        Self {
+            page_count: 20,
+            vocation_cache_time: 0,
+        }
     }
 }
 
