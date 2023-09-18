@@ -13,6 +13,8 @@ pub fn api(db: &Pool<MySql>) -> Api {
     Api { db: db.clone() }
 }
 
+// todo: cache results
+
 #[OpenApi(prefix_path = "/highscores", tag = "super::Tags::Highscores")]
 impl Api {
     /// Level Highscores
@@ -74,6 +76,30 @@ impl Api {
         };
         Ok(Json(characters))
     }
+
+    /// Vocation Highscores
+    #[oai(path = "/vocation", method = "post")]
+    async fn vocation(&self, data: Json<u32>) -> Result<Json<Vec<VocationHighscores>>> {
+        let cfg = config::get();
+        let mut ret = Vec::new();
+        for (name, vocations) in &cfg.character.vocations {
+            let params = format!("?{}", ", ?".repeat(vocations.len() - 1));
+            let query_str = format!(
+                r#"SELECT id, name, level, ? AS vocation FROM players WHERE world_id = ? AND vocation IN ( {} ) ORDER BY experience DESC LIMIT 1"#,
+                params
+            );
+            let mut query = sqlx::query_as::<_, VocationHighscores>(&query_str)
+                .bind(&name)
+                .bind(&data.0);
+            for i in vocations {
+                query = query.bind(i);
+            }
+            if let Some(row) = query.fetch_optional(&self.db).await.context("vocation")? {
+                ret.push(row);
+            }
+        }
+        Ok(Json(ret))
+    }
 }
 
 #[derive(Object)]
@@ -116,4 +142,12 @@ struct SkillHighscores {
     id: i32,
     name: String,
     level: u32,
+}
+
+#[derive(Object, FromRow)]
+struct VocationHighscores {
+    id: i32,
+    name: String,
+    level: u32,
+    vocation: String,
 }
