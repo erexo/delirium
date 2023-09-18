@@ -1,4 +1,6 @@
-use crate::config;
+use std::{collections::HashMap, sync::Mutex};
+
+use crate::{config, utils::time};
 
 use super::prelude::*;
 use anyhow::Context;
@@ -7,13 +9,15 @@ use sqlx::{query_as, FromRow, MySql, Pool};
 
 pub struct Api {
     db: Pool<MySql>,
+    vocation_cache: Mutex<HashMap<u32, VocationHighscoresCache>>,
 }
 
 pub fn api(db: &Pool<MySql>) -> Api {
-    Api { db: db.clone() }
+    Api {
+        db: db.clone(),
+        vocation_cache: Mutex::new(HashMap::new()),
+    }
 }
-
-// todo: cache results
 
 #[OpenApi(prefix_path = "/highscores", tag = "super::Tags::Highscores")]
 impl Api {
@@ -81,6 +85,20 @@ impl Api {
     #[oai(path = "/vocation", method = "post")]
     async fn vocation(&self, data: Json<u32>) -> Result<Json<Vec<VocationHighscores>>> {
         let cfg = config::get();
+        if !cfg.worlds.contains_key(&data.0) {
+            return Err(InvalidData.into());
+        }
+
+        let cache_time = cfg.highscores.vocation_cache_time;
+        if cache_time > 0 {
+            let cache = self.vocation_cache.lock().unwrap();
+            if let Some(cache) = cache.get(&data.0) {
+                if cache.time + cache_time > time::now() {
+                    return Ok(Json(cache.vocation_highscores.clone()));
+                }
+            }
+        }
+
         let mut ret = Vec::new();
         for (name, vocations) in &cfg.character.vocations {
             let params = format!("?{}", ", ?".repeat(vocations.len() - 1));
@@ -97,6 +115,17 @@ impl Api {
             if let Some(row) = query.fetch_optional(&self.db).await.context("vocation")? {
                 ret.push(row);
             }
+        }
+
+        if cache_time > 0 {
+            let mut cache = self.vocation_cache.lock().unwrap();
+            cache.insert(
+                data.0,
+                VocationHighscoresCache {
+                    vocation_highscores: ret.clone(),
+                    time: time::now(),
+                },
+            );
         }
         Ok(Json(ret))
     }
@@ -144,7 +173,12 @@ struct SkillHighscores {
     level: u32,
 }
 
-#[derive(Object, FromRow)]
+struct VocationHighscoresCache {
+    vocation_highscores: Vec<VocationHighscores>,
+    time: usize,
+}
+
+#[derive(Object, FromRow, Clone)]
 struct VocationHighscores {
     id: i32,
     name: String,
