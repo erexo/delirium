@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::{collections::HashMap, fmt, sync::Mutex};
 
 use crate::{config, utils::time};
 
@@ -54,30 +54,41 @@ impl Api {
         let count = cfg.highscores.page_count;
         let skip = count * data.page_number;
 
-        let characters = if data.skill == Skill::Ninjutsu {
-            query_as!(
+        let characters = match data.skill {
+            Skill::Fist => query_as!(
                 SkillHighscores,
-                r#"SELECT id, name, maglevel AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY maglevel DESC LIMIT ?, ?"#,
-                &data.world,
-                &skip,
-                &count,
-            )
-            .fetch_all(&self.db)
-            .await
-            .context("ninjutsu")?
-        } else {
-            query_as!(
+                r#"SELECT id, name, skill_fist AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY skill_fist DESC, skill_fist_tries DESC LIMIT ?, ?"#,
+                &data.world, &skip, &count).fetch_all(&self.db).await,
+            Skill::Club => query_as!(
                 SkillHighscores,
-                r#"SELECT p.id, p.name, s.value AS level FROM players p INNER JOIN player_skills s ON p.id = s.player_id WHERE p.group_id < 3 AND p.world_id = ? AND s.skillid = ? ORDER BY s.value DESC, s.count DESC LIMIT ?, ?"#,
-                &data.world,
-                data.skill as u32,
-                &skip,
-                &count,
-            )
-            .fetch_all(&self.db)
-            .await
-            .context("ninjutsu")?
-        };
+                r#"SELECT id, name, skill_club AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY skill_club DESC, skill_club_tries DESC LIMIT ?, ?"#,
+                &data.world, &skip, &count).fetch_all(&self.db).await,
+            Skill::Sword => query_as!(
+                SkillHighscores,
+                r#"SELECT id, name, skill_sword AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY skill_sword DESC, skill_sword_tries DESC LIMIT ?, ?"#,
+                &data.world, &skip, &count).fetch_all(&self.db).await,
+            Skill::Axe => query_as!(
+                SkillHighscores,
+                r#"SELECT id, name, skill_axe AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY skill_axe DESC, skill_axe_tries DESC LIMIT ?, ?"#,
+                &data.world, &skip, &count).fetch_all(&self.db).await,
+            Skill::Distance => query_as!(
+                SkillHighscores,
+                r#"SELECT id, name, skill_dist AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY skill_dist DESC, skill_dist_tries DESC LIMIT ?, ?"#,
+                &data.world, &skip, &count).fetch_all(&self.db).await,
+            Skill::Shielding => query_as!(
+                SkillHighscores,
+                r#"SELECT id, name, skill_shielding  AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY skill_shielding DESC, skill_shielding_tries DESC LIMIT ?, ?"#,
+                &data.world, &skip, &count).fetch_all(&self.db).await,
+            Skill::Fishing => query_as!(
+                SkillHighscores,
+                r#"SELECT id, name, skill_fishing AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY skill_fishing DESC, skill_fishing_tries DESC LIMIT ?, ?"#,
+                &data.world, &skip, &count).fetch_all(&self.db).await,
+            Skill::Magic => query_as!(
+                SkillHighscores,
+                r#"SELECT id, name, maglevel AS "level: u32" FROM players WHERE group_id < 3 AND world_id = ? ORDER BY maglevel DESC, manaspent DESC LIMIT ?, ?"#,
+                &data.world, &skip, &count).fetch_all(&self.db).await,
+        }.context(data.skill)?;
+
         Ok(Json(characters))
     }
 
@@ -146,16 +157,22 @@ struct SkillHighscoresData {
     page_number: u32,
 }
 
-#[derive(Enum, Copy, Clone, PartialEq)]
+#[derive(Debug, Enum, Copy, Clone, PartialEq)]
 enum Skill {
     Fist = 0,
-    Glove = 1,
+    Club = 1,
     Sword = 2,
-    Focus = 3,
+    Axe = 3,
     Distance = 4,
     Shielding = 5,
-    Control = 6,
-    Ninjutsu = 7,
+    Fishing = 6,
+    Magic = 7,
+}
+
+impl fmt::Display for Skill {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
 #[derive(Object, FromRow)]
