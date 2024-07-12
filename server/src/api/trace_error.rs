@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use poem::{Endpoint, Error, IntoResponse, Middleware, Request, Response};
 use tracing::error;
 
@@ -17,7 +16,6 @@ pub struct TraceErrorEndpoint<E> {
     inner: E,
 }
 
-#[async_trait]
 impl<E: Endpoint> Endpoint for TraceErrorEndpoint<E> {
     type Output = Response;
 

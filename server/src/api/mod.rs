@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use poem::{
-    http::StatusCode, middleware::CatchPanic, Endpoint, EndpointExt, IntoEndpoint, Middleware,
-    Route,
+    endpoint::StaticFilesEndpoint, http::StatusCode, middleware::CatchPanic, Endpoint, EndpointExt,
+    IntoEndpoint, Middleware, Route,
 };
 use poem_openapi::OpenApiService;
 use sqlx::{MySql, Pool};
@@ -23,12 +23,23 @@ pub fn routes(db: &Pool<MySql>, jwt: jwt::Service) -> impl IntoEndpoint {
         account::api(db, jwt),
         character::api(db),
         highscores::api(db),
+        deaths::api(db),
         online::api(db),
     );
-    let api = OpenApiService::new(controllers, &config::get().api.name, "1.0");
+
+    let prefix = &config::get().api.prefix;
+
+    let api = OpenApiService::new(controllers, &config::get().api.name, "1.0").url_prefix(prefix);
     let docs = api.swagger_ui();
+
     Route::new()
-        .nest("/", api)
+        .nest(
+            "/",
+            StaticFilesEndpoint::new("./wwwroot")
+                .index_file("index.html")
+                .fallback_to_index(),
+        )
+        .nest(prefix, api)
         .nest("/swagger", docs)
         .with(catch_panic())
         .with(trace_error::TraceError)

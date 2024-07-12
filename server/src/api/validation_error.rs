@@ -18,7 +18,8 @@ pub enum ValidationError {
     IndistinctPasswords,
     InvalidCurrentPassword,
     TooManyCharacters,
-    PlayerAlreadyExists,
+    CharacterAlreadyExists,
+    CharacterNotExists,
 }
 
 #[derive(Object)]

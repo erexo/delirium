@@ -43,6 +43,7 @@ pub struct Config {
     pub account: Account,
     pub character: Character,
     pub highscores: Highscores,
+    pub deaths: Deaths,
     pub validation: Validation,
     pub debug: Debug,
 }
@@ -52,6 +53,7 @@ pub struct Api {
     pub name: String,
     pub address: IpAddr,
     pub port: u16,
+    pub prefix: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -92,6 +94,12 @@ pub struct Character {
 pub struct Highscores {
     pub page_count: u32,
     pub vocation_cache_time: usize,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Deaths {
+    pub page_count: u32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -156,6 +164,7 @@ impl Default for Api {
             name: "Delirium".to_owned(),
             address: Ipv4Addr::new(127, 0, 0, 1).into(),
             port: 80,
+            prefix: "/api".to_owned(),
         }
     }
 }
@@ -206,6 +215,12 @@ impl Default for Highscores {
             page_count: 20,
             vocation_cache_time: 0,
         }
+    }
+}
+
+impl Default for Deaths {
+    fn default() -> Self {
+        Self { page_count: 25 }
     }
 }
 

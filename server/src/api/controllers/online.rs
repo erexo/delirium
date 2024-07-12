@@ -17,7 +17,7 @@ pub fn api(db: &Pool<MySql>) -> Api {
 impl Api {
     /// Online Players
     #[oai(path = "/", method = "post")]
-    async fn level(&self, data: Json<u32>) -> Result<Json<Vec<OnlinePlayer>>> {
+    async fn online(&self, data: Json<u32>) -> Result<Json<Vec<OnlinePlayer>>> {
         let cfg = config::get();
         if !cfg.worlds.contains_key(&data) {
             return Err(InvalidData.into());
@@ -30,7 +30,7 @@ impl Api {
             )
             .fetch_all(&self.db)
             .await
-            .context("level")?
+            .context("online")?
             .into_iter()
             .map(|o| {
                 let mut vocstr = "Unknown";

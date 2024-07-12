@@ -4,7 +4,7 @@ use super::prelude::*;
 use anyhow::Context;
 use delirium_macros::Validation;
 use poem_openapi::{payload::Json, Object, OpenApi};
-use sqlx::{query, MySql, Pool};
+use sqlx::{query, query_as, FromRow, MySql, Pool};
 use tracing::info;
 
 pub struct Api {
@@ -54,7 +54,7 @@ impl Api {
         .context("validation")?
         .is_some()
         {
-            return Err(PlayerAlreadyExists.into());
+            return Err(CharacterAlreadyExists.into());
         }
 
         let cfg = &cfg.character.new;
@@ -133,13 +133,68 @@ impl Api {
         };
         Ok(())
     }
+
+    /// Get Character
+    #[oai(path = "/", method = "get")]
+    async fn character(&self, id: Json<i32>) -> Result<Json<Character>> {
+        let record = query_as!(
+            CharacterRow,
+            "SELECT name, level, vocation, world_id FROM players WHERE id=? AND NOT deleted",
+            id.0
+        )
+        .fetch_optional(&self.db)
+        .await
+        .context("record")?
+        .ok_or(CharacterNotExists)?;
+
+        let mut vocation = String::new();
+        let cfg = config::get();
+        for (name, ids) in cfg.character.vocations.iter() {
+            for id in ids {
+                if &record.vocation == id {
+                    vocation = name.clone();
+                    break;
+                }
+            }
+        }
+        let mut world = String::new();
+        for (id, name) in cfg.worlds.iter() {
+            if &record.world_id == id {
+                world = name.clone();
+                break;
+            }
+        }
+        Ok(Json(Character {
+            name: record.name,
+            level: record.level,
+            vocation,
+            world,
+        }))
+    }
 }
 
 #[derive(Object, Validation)]
 #[val(trim, ascii, length = "crate::config::field_length")]
 struct CreateCharacter {
-    #[val(to_title, pattern = r"^(?:[a-zA-Z]{3,}\b(?:\s+[a-zA-Z]{3,}\b){0,2})?$")]
+    #[val(to_title, pattern = r"^(?:[A-Z][a-z]{2,}\b(?: [A-Z][a-z]{2,}\b){0,2})?$")]
     name: String,
     vocation: u32,
     world: u32,
+}
+
+#[derive(FromRow)]
+struct CharacterRow {
+    name: String,
+    level: u32,
+    vocation: u32,
+    world_id: u32,
+}
+
+#[derive(Object)]
+#[oai(rename_all = "camelCase")]
+struct Character {
+    name: String,
+    level: u32,
+    vocation: String,
+    world: String,
 }

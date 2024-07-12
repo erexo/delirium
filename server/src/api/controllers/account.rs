@@ -62,6 +62,7 @@ impl Api {
         .last_insert_id() as i32;
 
         let (account_token, refresh_token) = self.jwt.register(id)?;
+
         Ok(Json(Tokens {
             account_token,
             refresh_token,

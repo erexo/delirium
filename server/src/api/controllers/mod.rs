@@ -1,5 +1,6 @@
 pub(super) mod account;
 pub(super) mod character;
+pub(super) mod deaths;
 pub(super) mod highscores;
 pub(super) mod online;
 pub(super) mod validation;
@@ -15,5 +16,6 @@ pub enum Tags {
     Character,
     Highscores,
     Online,
+    Deaths,
     Validation,
 }
